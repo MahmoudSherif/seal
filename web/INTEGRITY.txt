@@ -1,0 +1,19 @@
+0e7a0151bb3765ab8aa596a3a6f3acf7a2a269bd584cff2eed259c4b7860f1bd  seal web app
+
+This is the SHA-256 hash of all JavaScript loaded by the seal web app,
+in their load order:
+  vendor/scrypt.js
+  vendor/pako.min.js
+  tar.js
+  zip.js
+  seal.js
+  app.js
+
+# How to verify
+# Run:   bash web/verify.sh                              # verify your local copy
+# Or:    bash web/verify.sh https://you.github.io/seal/  # verify your deployed site
+# The deployed page also displays this hash in the "Verify this page" badge
+# at the bottom — open dev tools to confirm no other JS is being loaded.
+
+# When to regenerate
+# Whenever any file in the SCRIPTS list above changes (CI does this for you).

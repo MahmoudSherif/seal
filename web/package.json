@@ -1,0 +1,12 @@
+{
+  "name": "seal-web",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Client-side seal encryption — runs in any browser, hosted on GitHub Pages.",
+  "license": "MIT",
+  "comment": "vendor/ already contains the libraries below; this manifest exists only to document them and let `npm install` reproduce the vendored files if desired.",
+  "dependencies": {
+    "pako": "^2.1.0",
+    "scrypt-js": "^3.0.1"
+  }
+}

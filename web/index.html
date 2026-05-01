@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Encrypt files and folders in your browser. Password never leaves your device. AES-256-GCM, scrypt KDF, fully open source.">
+<title>seal — encrypt files in your browser</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --paper:        #f4ecd8;
+    --paper-dark:   #ebe2c7;
+    --ink:          #1c1612;
+    --ink-soft:     #4a3f37;
+    --ink-faint:    #877a6b;
+    --rule:         #c8b896;
+    --wax:          #7a1f2b;
+    --wax-bright:   #a02a3a;
+    --wax-shadow:   #4d0e17;
+    --moss:         #4a5a3a;
+    --warning:      #b8541a;
+    --grain-opacity: 0.04;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* faint paper grain */
+body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+        radial-gradient(circle at 17% 23%, rgba(0,0,0,var(--grain-opacity)) 1px, transparent 1px),
+        radial-gradient(circle at 73% 61%, rgba(0,0,0,var(--grain-opacity)) 1px, transparent 1px),
+        radial-gradient(circle at 41% 87%, rgba(0,0,0,var(--grain-opacity)) 1px, transparent 1px);
+    background-size: 5px 5px, 7px 7px, 11px 11px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 28px 80px;
+    position: relative;
+    z-index: 1;
+}
+
+/* =================== HEADER =================== */
+
+header {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-gap: 28px;
+    align-items: start;
+    margin-bottom: 36px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--rule);
+}
+
+.seal-mark {
+    width: 78px; height: 78px;
+    flex-shrink: 0;
+    position: relative;
+    filter: drop-shadow(0 2px 4px rgba(77, 14, 23, 0.3));
+}
+.seal-mark svg { display: block; width: 100%; height: 100%; }
+
+.title-block h1 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 38px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+    margin-bottom: 8px;
+}
+.title-block h1 .dot { color: var(--wax); }
+.tagline {
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    letter-spacing: 0.005em;
+    max-width: 50ch;
+}
+.metaline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 14px;
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.metaline span::before { content: "▪ "; color: var(--wax); }
+
+/* =================== CARD =================== */
+
+.card {
+    background: var(--paper-dark);
+    border: 1px solid var(--rule);
+    padding: 0;
+    box-shadow: 2px 3px 0 var(--rule);
+    margin-bottom: 28px;
+    position: relative;
+}
+
+.card-head {
+    border-bottom: 1px solid var(--rule);
+    padding: 14px 22px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.card-head h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+}
+.card-head .ord {
+    color: var(--wax);
+    font-weight: 700;
+    margin-right: 6px;
+}
+
+.card-body { padding: 22px; }
+
+/* =================== MODE SWITCHER =================== */
+
+.mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--ink);
+    margin-bottom: 4px;
+}
+.mode-tab {
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 120ms;
+}
+.mode-tab:first-child { border-right: 1px solid var(--ink); }
+.mode-tab:hover { background: rgba(28,22,18,0.05); }
+.mode-tab[aria-selected="true"] {
+    background: var(--ink);
+    color: var(--paper);
+}
+
+/* =================== DROP ZONE =================== */
+
+.drop-zone {
+    border: 2px dashed var(--rule);
+    border-radius: 0;
+    padding: 36px 22px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 150ms, background 150ms;
+    margin-top: 18px;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--wax);
+    background: rgba(122,31,43,0.04);
+}
+.drop-zone.has-file {
+    border-style: solid;
+    border-color: var(--ink);
+}
+.drop-zone .prompt {
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 17px;
+}
+.drop-zone .or-line {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin: 14px 0 10px;
+}
+.drop-zone .pick-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.btn-pick {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 8px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 120ms, color 120ms;
+}
+.btn-pick:hover { background: var(--ink); color: var(--paper); }
+.btn-pick:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: var(--paper);
+    color: var(--ink);
+}
+
+.selected-info {
+    display: none;
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+}
+.drop-zone.has-file .selected-info { display: block; }
+.drop-zone.has-file .prompt,
+.drop-zone.has-file .or-line,
+.drop-zone.has-file .pick-buttons { display: none; }
+
+.selected-info .file-name {
+    font-weight: 600;
+    color: var(--ink);
+    word-break: break-all;
+    margin-bottom: 6px;
+}
+.selected-info .file-meta {
+    color: var(--ink-faint);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.selected-info .clear-btn {
+    background: transparent;
+    border: none;
+    color: var(--wax);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    margin-top: 10px;
+    padding: 4px 0;
+}
+.selected-info .clear-btn:hover { color: var(--wax-bright); text-decoration: underline; }
+
+/* =================== INPUTS =================== */
+
+input[type="file"] { display: none; }
+
+label.field-label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 16px 0 6px;
+}
+
+input[type="password"], input[type="text"] {
+    width: 100%;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 11px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--ink);
+    transition: border-color 100ms, box-shadow 100ms;
+}
+input[type="password"]:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: var(--wax);
+    box-shadow: 0 0 0 1px var(--wax);
+}
+
+.show-pw {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    user-select: none;
+}
+.show-pw input { accent-color: var(--wax); }
+
+/* =================== ACTION BUTTON =================== */
+
+.action {
+    width: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 18px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 150ms, transform 50ms;
+    margin-top: 22px;
+    position: relative;
+    overflow: hidden;
+}
+.action:hover:not(:disabled) { background: var(--wax); }
+.action:active:not(:disabled) { transform: translateY(1px); }
+.action:disabled {
+    background: var(--ink-faint);
+    cursor: wait;
+    color: var(--paper-dark);
+}
+.action .arrow {
+    display: inline-block;
+    margin-left: 12px;
+    transition: transform 200ms;
+}
+.action:hover:not(:disabled) .arrow { transform: translateX(4px); }
+
+/* =================== PROGRESS / STATUS =================== */
+
+.status-area {
+    margin-top: 22px;
+    min-height: 22px;
+}
+.progress-bar {
+    height: 4px;
+    background: var(--rule);
+    overflow: hidden;
+    margin-bottom: 8px;
+    display: none;
+}
+.progress-bar.active { display: block; }
+.progress-fill {
+    height: 100%;
+    background: var(--wax);
+    width: 0%;
+    transition: width 200ms ease-out;
+}
+.status-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    min-height: 18px;
+}
+.status-text.error { color: var(--wax); font-weight: 500; }
+.status-text.success { color: var(--moss); font-weight: 500; }
+
+/* =================== INFO PANEL =================== */
+
+.info-panel {
+    background: var(--paper-dark);
+    border-left: 3px solid var(--wax);
+    padding: 14px 18px;
+    margin-top: 18px;
+    display: none;
+    font-size: 14px;
+}
+.info-panel.show { display: block; }
+.info-panel h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    color: var(--ink-soft);
+}
+.info-panel dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+}
+.info-panel dt {
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    align-self: center;
+}
+.info-panel dd { color: var(--ink); }
+
+/* =================== PASSWORD ENHANCEMENTS =================== */
+
+.pw-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+.pw-row input { flex: 1; }
+.btn-generate {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 0 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: background 120ms, color 120ms;
+}
+.btn-generate:hover { background: var(--ink); color: var(--paper); }
+.btn-generate:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.strength-meter {
+    margin-top: 8px;
+    display: none;
+}
+.strength-meter.visible { display: block; }
+.strength-bar {
+    height: 3px;
+    background: var(--rule);
+    overflow: hidden;
+}
+.strength-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--wax);
+    transition: width 200ms ease-out, background-color 200ms;
+}
+.strength-bar-fill.weak    { background: #b8541a; }
+.strength-bar-fill.fair    { background: #c89a3a; }
+.strength-bar-fill.good    { background: #6a823a; }
+.strength-bar-fill.strong  { background: #4a5a3a; }
+.strength-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+    text-transform: uppercase;
+}
+.strength-label .level { font-weight: 600; }
+.strength-label.weak    .level { color: #b8541a; }
+.strength-label.fair    .level { color: #c89a3a; }
+.strength-label.good    .level { color: #6a823a; }
+.strength-label.strong  .level { color: #4a5a3a; }
+
+/* =================== OPTIONS ROW =================== */
+
+.options {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.option {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    cursor: pointer;
+    user-select: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+}
+.option input { accent-color: var(--wax); margin-top: 2px; flex-shrink: 0; }
+.option .option-text { flex: 1; }
+.option .option-desc {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 2px;
+    font-style: italic;
+}
+
+/* =================== INTEGRITY BADGE =================== */
+
+.integrity-badge {
+    margin-top: 24px;
+    padding: 12px 16px;
+    background: var(--paper-dark);
+    border: 1px solid var(--rule);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    word-break: break-all;
+    line-height: 1.5;
+}
+.integrity-badge .label {
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: block;
+    margin-bottom: 4px;
+}
+.integrity-badge code {
+    color: var(--ink);
+    background: transparent;
+    padding: 0;
+}
+.integrity-badge .verify-link {
+    color: var(--wax);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.integrity-badge .verify-link:hover { color: var(--wax-bright); }
+
+/* =================== TRUST SECTION =================== */
+
+.trust {
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid var(--rule);
+}
+.trust h2 {
+    font-family: 'Newsreader', serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--ink);
+    font-style: italic;
+}
+.trust .pull {
+    font-size: 18px;
+    line-height: 1.6;
+    margin-bottom: 22px;
+    color: var(--ink-soft);
+    max-width: 60ch;
+}
+.trust .pull strong { color: var(--ink); font-weight: 600; }
+
+.specs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 18px 24px;
+    margin-top: 24px;
+}
+.spec h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--wax);
+    margin-bottom: 4px;
+}
+.spec p {
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+}
+.spec code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--paper-dark);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--ink);
+}
+
+/* =================== FOOTER =================== */
+
+footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    text-align: center;
+}
+footer a {
+    color: var(--ink-soft);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 2px;
+}
+footer a:hover { color: var(--wax); text-decoration-color: var(--wax); }
+
+/* =================== RESPONSIVE =================== */
+
+@media (max-width: 540px) {
+    main { padding: 36px 18px 60px; }
+    header { grid-template-columns: 1fr; gap: 16px; }
+    .seal-mark { width: 60px; height: 60px; }
+    .title-block h1 { font-size: 30px; }
+    .specs { grid-template-columns: 1fr; }
+}
+
+/* Reduced-motion respect */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Subtle reveal on load */
+@keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+header, .card, .trust { animation: rise 600ms ease-out backwards; }
+.card  { animation-delay: 80ms; }
+.trust { animation-delay: 160ms; }
+</style>
+</head>
+<body>
+
+<main>
+
+<header>
+    <div class="seal-mark" aria-hidden="true">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- wax seal: scalloped circle with stamped initial -->
+            <defs>
+                <radialGradient id="waxGrad" cx="50%" cy="40%" r="55%">
+                    <stop offset="0%"   stop-color="#a02a3a"/>
+                    <stop offset="60%"  stop-color="#7a1f2b"/>
+                    <stop offset="100%" stop-color="#4d0e17"/>
+                </radialGradient>
+                <filter id="rough" x="0" y="0">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2"/>
+                    <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+                </filter>
+            </defs>
+            <!-- scalloped wax body -->
+            <g filter="url(#rough)">
+                <path d="
+                    M 50 8
+                    L 60 14 L 70 11 L 76 20 L 86 22 L 88 32
+                    L 95 39 L 92 50 L 95 60 L 88 67 L 86 77
+                    L 76 80 L 70 89 L 60 86 L 50 92 L 40 86
+                    L 30 89 L 24 80 L 14 77 L 12 67 L 5 60
+                    L 8 50 L 5 39 L 12 32 L 14 22 L 24 20
+                    L 30 11 L 40 14 Z"
+                    fill="url(#waxGrad)" />
+            </g>
+            <!-- inner ring -->
+            <circle cx="50" cy="50" r="26" fill="none"
+                    stroke="#4d0e17" stroke-width="1.5" opacity="0.5"/>
+            <!-- impressed letter S -->
+            <text x="50" y="64" text-anchor="middle"
+                  font-family="Georgia, serif" font-size="38"
+                  font-weight="700" font-style="italic"
+                  fill="#4d0e17" opacity="0.85">S</text>
+        </svg>
+    </div>
+    <div class="title-block">
+        <h1>seal<span class="dot">.</span></h1>
+        <p class="tagline">Encrypt files and folders in your browser.<br>
+            Your data and password never leave your device.</p>
+        <div class="metaline">
+            <span>Client-side only</span>
+            <span>AES-256-GCM</span>
+            <span>scrypt KDF</span>
+            <span>Open source</span>
+        </div>
+    </div>
+</header>
+
+<!-- ============ MAIN PANEL ============ -->
+<section class="card" aria-labelledby="action-heading">
+    <div class="card-head">
+        <h2 id="action-heading"><span class="ord">i.</span> Choose what to do</h2>
+    </div>
+    <div class="card-body">
+        <div class="mode-tabs" role="tablist">
+            <button class="mode-tab" role="tab" aria-selected="true" data-mode="encrypt">Encrypt</button>
+            <button class="mode-tab" role="tab" aria-selected="false" data-mode="decrypt">Decrypt</button>
+        </div>
+
+        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Select or drop files">
+            <p class="prompt" id="dropPrompt">Drop a file here to encrypt it.</p>
+            <p class="or-line">— or —</p>
+            <div class="pick-buttons">
+                <button class="btn-pick" id="pickFileBtn">Choose file</button>
+                <button class="btn-pick" id="pickFolderBtn">Choose folder</button>
+            </div>
+            <div class="selected-info">
+                <div class="file-name" id="fileName"></div>
+                <div class="file-meta" id="fileMeta"></div>
+                <button class="clear-btn" id="clearBtn">✕ Remove</button>
+            </div>
+        </div>
+
+        <input type="file" id="fileInput">
+        <input type="file" id="folderInput" webkitdirectory directory multiple>
+
+        <div class="info-panel" id="infoPanel">
+            <h3>About this file</h3>
+            <dl>
+                <dt>format</dt><dd id="infoFormat">—</dd>
+                <dt>kind</dt>  <dd id="infoKind">—</dd>
+                <dt>size</dt>  <dd id="infoSize">—</dd>
+            </dl>
+        </div>
+
+        <label class="field-label" for="passwordInput">Password</label>
+        <div class="pw-row">
+            <input type="password" id="passwordInput" autocomplete="off"
+                   placeholder="Enter a strong password" spellcheck="false">
+            <button class="btn-generate" id="generateBtn" type="button"
+                    title="Generate a strong random passphrase">Generate</button>
+        </div>
+
+        <div class="strength-meter" id="strengthMeter">
+            <div class="strength-bar"><div class="strength-bar-fill" id="strengthFill"></div></div>
+            <div class="strength-label" id="strengthLabel">
+                Strength: <span class="level" id="strengthLevel">—</span>
+                <span id="strengthBits"></span>
+            </div>
+        </div>
+
+        <label class="field-label" for="confirmInput" id="confirmLabel">Confirm password</label>
+        <input type="password" id="confirmInput" autocomplete="off"
+               placeholder="Type it again" spellcheck="false">
+
+        <label class="show-pw">
+            <input type="checkbox" id="showPwCheckbox">
+            Show password
+        </label>
+
+        <div class="options">
+            <label class="option" id="hideNameOption">
+                <input type="checkbox" id="hideNameCheckbox">
+                <span class="option-text">
+                    Hide original filename
+                    <span class="option-desc">The output file's name reveals nothing
+                        about the input. The recipient gets the real name back on
+                        decryption. (Single files only.)</span>
+                </span>
+            </label>
+            <label class="option">
+                <input type="checkbox" id="selfDestructCheckbox" checked>
+                <span class="option-text">
+                    Self-destruct on success
+                    <span class="option-desc">Wipe the password fields and clear the
+                        clipboard after a successful encrypt or decrypt.</span>
+                </span>
+            </label>
+        </div>
+
+        <button class="action" id="actionBtn">
+            <span id="actionText">Encrypt &amp; download</span>
+            <span class="arrow">→</span>
+        </button>
+
+        <div class="status-area">
+            <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="status-text" id="statusText">Ready.</div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ TRUST / EXPLAINER ============ -->
+<section class="trust">
+    <h2>How it works.</h2>
+    <p class="pull">
+        Everything happens in <strong>your browser</strong>. Your files never
+        upload to a server. Your password is used to derive an encryption key
+        on this page and is then thrown away. There is no account, no log,
+        no analytics, no third party.
+    </p>
+
+    <div class="specs">
+        <div class="spec">
+            <h4>Cipher</h4>
+            <p>AES-256-GCM authenticated encryption. Any single-bit
+            tampering fails decryption with a clear error.</p>
+        </div>
+        <div class="spec">
+            <h4>Key derivation</h4>
+            <p><code>scrypt(N=2¹⁷, r=8, p=1)</code> — about a second per
+            attempt to make brute-forcing expensive.</p>
+        </div>
+        <div class="spec">
+            <h4>Streaming chunks</h4>
+            <p>64 KiB chunks, individually authenticated, with a flag bound
+            into the AEAD nonce that catches truncation and extension.</p>
+        </div>
+        <div class="spec">
+            <h4>Folder support</h4>
+            <p>Folders are packed as <code>tar.gz</code> in the browser,
+            encrypted, and delivered as a single <code>.seal</code> file.</p>
+        </div>
+        <div class="spec">
+            <h4>Same format, three tools</h4>
+            <p>Files made here open with the
+            <a href="https://github.com/MahmoudSherif/seal" style="color:var(--wax)">command-line and desktop tools</a> — and vice versa.</p>
+        </div>
+        <div class="spec">
+            <h4>Open source</h4>
+            <p>MIT licensed. Audit the source, run it offline, host your
+            own copy. The page itself is the entire app.</p>
+        </div>
+    </div>
+
+    <div class="integrity-badge" id="integrityBadge">
+        <span class="label">Verify this page</span>
+        <span id="integrityText">
+            Computing the hash of the script you're running…
+        </span>
+    </div>
+</section>
+
+<footer>
+    seal · client-side encryption · <a href="https://github.com/MahmoudSherif/seal">github.com/MahmoudSherif/seal</a>
+</footer>
+
+</main>
+
+<!-- vendored libraries -->
+<script src="vendor/scrypt.js"></script>
+<script src="vendor/pako.min.js"></script>
+<!-- our modules -->
+<script src="tar.js"></script>
+<script src="zip.js"></script>
+<script src="seal.js"></script>
+<!-- app controller -->
+<script src="app.js"></script>
+
+</body>
+</html>

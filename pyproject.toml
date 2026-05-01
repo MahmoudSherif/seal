@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seal-crypt"
+version = "3.1.0"
+description = "Simple, secure password-based file & folder encryption (AES-256-GCM + scrypt)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "the seal contributors" }]
+keywords = ["encryption", "aes", "gcm", "scrypt", "password", "cli", "gui"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+# Replace these with your real URLs once the repo is up.
+Homepage = "https://github.com/MahmoudSherif/seal"
+Source = "https://github.com/MahmoudSherif/seal"
+Issues = "https://github.com/MahmoudSherif/seal/issues"
+
+[project.scripts]
+seal = "seal:main"
+
+[project.gui-scripts]
+seal-gui = "seal_gui:main"
+
+[tool.setuptools]
+py-modules = ["seal", "seal_gui"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
