@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual envs
+.venv/
+venv/
+env/
+.python-version
+
+# Packaging
+*.spec
+pyinstaller-build/
+
+# Tests
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local secrets / scratch (never commit these)
+*.seal
+*.key
+secret*.txt
+
+# Node / web app
+node_modules/
+*.log
+.npm/
+.yarn/

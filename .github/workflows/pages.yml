@@ -1,0 +1,68 @@
+name: deploy-pages
+
+# Publishes the contents of web/ to GitHub Pages.
+#
+# To enable: in your repo Settings → Pages, set "Source" to "GitHub Actions".
+# Then push to main and the site will appear at:
+#   https://<your-username>.github.io/<repo-name>/
+#
+# Because the entire app runs client-side, no build step or backend is
+# needed. We just upload web/ as the site root.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent deployment, but don't cancel in-flight runs since
+# a half-finished deploy could break the live site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify INTEGRITY.txt is up to date
+        run: |
+          # The integrity hash in INTEGRITY.txt must match the SHA-256 of
+          # the JS bundle being deployed. If not, fail loudly so a stale
+          # hash never gets published — that would break the verification
+          # users rely on.
+          cd web
+          if ! bash verify.sh; then
+            echo ""
+            echo "::error::INTEGRITY.txt is stale. Regenerate it locally:"
+            echo "  cd web"
+            echo '  HASH=$(cat vendor/scrypt.js vendor/pako.min.js tar.js zip.js seal.js app.js | sha256sum | awk "{print \$1}")'
+            echo '  sed -i "1s/^[a-f0-9]\{64\}/$HASH/" INTEGRITY.txt'
+            echo ""
+            echo "Then commit the updated INTEGRITY.txt and push again."
+            exit 1
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload web/ as artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
