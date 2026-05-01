@@ -39,21 +39,20 @@ jobs:
 
       - name: Verify INTEGRITY.txt is up to date
         run: |
-          # The integrity hash in INTEGRITY.txt must match the SHA-256 of
-          # the JS bundle being deployed. If not, fail loudly so a stale
-          # hash never gets published — that would break the verification
-          # users rely on.
           cd web
-          if ! bash verify.sh; then
-            echo ""
+          EXPECTED=$(grep -oE '^[a-f0-9]{64}' INTEGRITY.txt | head -1)
+          ACTUAL=$(cat vendor/scrypt.js vendor/pako.min.js tar.js zip.js seal.js app.js | sha256sum | awk '{print $1}')
+          echo "expected: $EXPECTED"
+          echo "actual:   $ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::INTEGRITY.txt is stale. Regenerate it locally:"
             echo "  cd web"
-            echo '  HASH=$(cat vendor/scrypt.js vendor/pako.min.js tar.js zip.js seal.js app.js | sha256sum | awk "{print \$1}")'
-            echo '  sed -i "1s/^[a-f0-9]\{64\}/$HASH/" INTEGRITY.txt'
-            echo ""
+            echo "  HASH=\$(cat vendor/scrypt.js vendor/pako.min.js tar.js zip.js seal.js app.js | sha256sum | awk '{print \$1}')"
+            echo "  sed -i \"1s/^[a-f0-9]\\{64\\}/\$HASH/\" INTEGRITY.txt"
             echo "Then commit the updated INTEGRITY.txt and push again."
             exit 1
           fi
+          echo "✓ INTEGRITY.txt matches the JS bundle."
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
